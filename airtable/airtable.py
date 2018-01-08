@@ -2,6 +2,7 @@ import json
 import posixpath 
 import requests
 from collections import OrderedDict
+import time
 
 API_URL = 'https://api.airtable.com/v%s/'
 API_VERSION = '0'
@@ -42,10 +43,19 @@ class Airtable(object):
         self.airtable_url = API_URL % API_VERSION
         self.base_url = posixpath.join(self.airtable_url, base_id)
         self.headers = {'Authorization': 'Bearer %s' % api_key}
+        # Timestamp for rate limiting:
+        request_ts = None
 
     def __request(self, method, url, params=None, payload=None):
         if method in ['POST', 'PUT', 'PATCH']:
             self.headers.update({'Content-type': 'application/json'})
+        # Rate limit: Make sure there are at least 250ms between any
+        # two requests
+        if request_ts is not None:
+            timediff = time.time()-request_ts
+            wait_time = .25-timediff
+            time.sleep(max(wait_time, 0))
+        request_ts = time.time()
         r = requests.request(method,
                              posixpath.join(self.base_url, url),
                              params=params,
